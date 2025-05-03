@@ -11,11 +11,11 @@ class TaxiQLearner:
 
     Parameters
     ----------
-    alpha : float
+    learning_rate : float
         Learning rate (α), controls how much new information overrides old.
-    gamma : float
+    discount_factor : float
         Discount factor (γ), determines the importance of future rewards.
-    epsilon : float
+    initial_exploration : float
         Initial exploration rate for ε-greedy policy.
     min_epsilon : float
         Minimum allowable value of ε after decay.
@@ -27,12 +27,15 @@ class TaxiQLearner:
         Number of training episodes.
     max_steps : int
         Maximum steps allowed per episode.
+    modified_env : gym.Wrapper, optional
+        A custom wrapper (e.g., TaxiQDomainModifier) to modify the reward structure.
+        If None, the default environment will be used.
     """
     
-    def __init__(self, alpha=0.8, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay_factor=0.999, decay_threshold=2000, n_episodes=5000, max_steps=100):
-        self.alpha = alpha
-        self.gamma = gamma
-        self.epsilon = epsilon
+    def __init__(self, learning_rate=0.8, discount_factor=0.95, initial_exploration=1.0, min_epsilon=0.01, decay_factor=0.999, decay_threshold=2000, n_episodes=5000, max_steps=100, modified_env=None):
+        self.alpha = learning_rate
+        self.gamma = discount_factor
+        self.epsilon = initial_exploration
         self.min_epsilon = min_epsilon
         self.decay_factor = decay_factor
         self.decay_threshold = decay_threshold
@@ -40,7 +43,10 @@ class TaxiQLearner:
         self.n_episodes = n_episodes
         self.max_steps = max_steps
         
-        self.env = gym.make('Taxi-v3')
+        # Wrap the environment with the domain modifier if provided
+        self.env = modified_env if modified_env else gym.make('Taxi-v3')
+        self.using_modified_env = modified_env is not None
+        
         self.n_states = self.env.observation_space.n
         self.n_actions = self.env.action_space.n
         self.Q = np.zeros((self.n_states, self.n_actions))
@@ -61,8 +67,10 @@ class TaxiQLearner:
         table.add_row("Initial Exploration (ε)", f"{self.epsilon:.3f}")
         table.add_row("Minimum Exploration (min ε)", f"{self.min_epsilon:.3f}")
         table.add_row("Decay Factor", f"{self.decay_factor:.3f}")
+        table.add_row("Decay Threshold", f"{self.decay_threshold}")
         table.add_row("Number of Episodes", f"{self.n_episodes}")
         table.add_row("Max Steps per Episode", f"{self.max_steps}")
+        table.add_row("Using Modified Environment", str(self.using_modified_env))
         
         # Print the table using the rich library
         console = Console()
@@ -182,6 +190,22 @@ class TaxiQLearner:
         
         if verbose:
             print(f"Q-table saved to {filename}")
+
+    def load_q_table(self, filename='q_table.csv', verbose=True):
+        """
+        Load Q-table from a CSV file.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the CSV file from which Q-table will be loaded.
+        verbose : bool
+            If True, print completion message after loading.
+        """
+        self.Q = np.loadtxt(filename, delimiter=',', skiprows=1, usecols=range(1, self.n_actions + 1))
+        
+        if verbose:
+            print(f"Q-table loaded from {filename}")
 
     def run(self, render_mode: str = None, num_episodes: int = 1, verbose: int = 1) -> float:
         """
