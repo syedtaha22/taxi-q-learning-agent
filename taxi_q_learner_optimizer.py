@@ -93,9 +93,9 @@ class TaxiQLearnerOptimizer:
             q_table_file = os.path.join(self.qtables_dir, f"{file_suffix}.csv")
 
             agent = TaxiQLearner(
-                alpha=lr,
-                gamma=gamma,
-                epsilon=epsilon,
+                learning_rate=lr,
+                discount_factor=gamma,
+                initial_exploration=epsilon,
                 decay_factor=decay,
                 decay_threshold=threshold
             )
