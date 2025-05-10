@@ -24,15 +24,19 @@ class TaxiQDomainModifier(Wrapper):
     manhattan_weight : float, optional
         A shaping term added as `-weight * delta`, where delta is the change
         in Manhattan distance to the goal. Default is 0 (disabled).
+    euclidean_weight : float, optional
+        A shaping term added as `-weight * delta`, where delta is the change
+        in Euclidean distance to the goal. Default is 0 (disabled).
     """
 
     def __init__(self, env, step_penalty=-1, illegal_move_penalty=-10,
-                 dropoff_reward=20, manhattan_weight=0.0):
+                 dropoff_reward=20, manhattan_weight=0.0, euclidean_weight=0.0):
         super().__init__(env)
         self.step_penalty = step_penalty
         self.illegal_move_penalty = illegal_move_penalty
         self.dropoff_reward = dropoff_reward
         self.manhattan_weight = manhattan_weight
+        self.euclidean_weight = euclidean_weight
 
         self.prev_goal = None
         self.prev_distance = None
@@ -85,8 +89,13 @@ class TaxiQDomainModifier(Wrapper):
 
         # Compute shaping reward if goal hasn't changed
         if self.prev_goal == goal and self.prev_distance is not None:
-            delta = self.prev_distance - current_distance
-            reward += self.manhattan_weight * delta  # positive if closer
+            manhattan_distance = abs(taxi_row - goal[0]) + abs(taxi_col - goal[1])
+            euclidean_distance = ((taxi_row - goal[0]) ** 2 + (taxi_col - goal[1]) ** 2) ** 0.5
+            reward += - self.manhattan_weight * manhattan_distance 
+            reward += - self.euclidean_weight * euclidean_distance
+            # delta = self.prev_distance - current_distance
+            # reward += min(0, self.manhattan_weight * delta)  # negative if further away
+            # reward += self.manhattan_weight * delta  # positive if closer
         else:
             # Reset memory on pickup/dropoff
             self.prev_goal = goal
