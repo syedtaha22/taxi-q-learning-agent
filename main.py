@@ -16,7 +16,7 @@ if __name__ == "__main__":
         runs = 0 # For calculating average reward over runs
         total_reward = 0 # For calculating average reward over runs
 
-        while True:
+        for _ in range(5):
             state, _ = env.reset()
             done = False
             runs += 1
