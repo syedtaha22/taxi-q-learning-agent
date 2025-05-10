@@ -84,7 +84,7 @@ class TaxiQVisualizer:
 
     def _normalize_q_values(self, q_vals):
         """
-        Normalize Q-values to the range [0, 1].
+        Normalize Q-values to the range [-1, 1], preserving sign.
 
         Parameters
         ----------
@@ -96,8 +96,10 @@ class TaxiQVisualizer:
         list of float
             Normalized Q-values.
         """
-        vmin, vmax = q_vals.min(), q_vals.max()
-        return [(q - vmin) / (vmax - vmin) if vmax > vmin else 0.0 for q in q_vals]
+        max_abs = np.max(np.abs(q_vals))
+        if max_abs == 0:
+            return [0.0 for _ in q_vals]
+        return [q / max_abs for q in q_vals]
 
     def _draw_grid(self, ax):
         """
@@ -156,13 +158,19 @@ class TaxiQVisualizer:
 
         for a in range(4):
             shade = norm_vals[a]
-            color = plt.cm.Greens(shade)
+
+            if shade > 0:
+                color = plt.cm.Greens(shade)
+            elif shade < 0:
+                color = plt.cm.Reds(-shade)
+            else:
+                color = (1, 1, 1, 0.5) # White for zero Q-value
             polygon = Polygon(triangles[a], facecolor=color, edgecolor='black', alpha=0.5, lw=0.3)
             ax.add_patch(polygon)
 
             cx = np.mean([p[0] for p in triangles[a]])
             cy = np.mean([p[1] for p in triangles[a]])
-            ax.text(cx, cy, f'{q_vals[a]:.2f}', ha='center', va='center', fontsize=8, alpha=0.5)
+            ax.text(cx, cy, f'{norm_vals[a]:.2f}', ha='center', va='center', fontsize=8, alpha=0.5)
 
     def _annotate_cell_entities(self, ax, taxi_row, taxi_col, passenger_loc, destination):
         """
