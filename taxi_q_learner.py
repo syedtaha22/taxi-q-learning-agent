@@ -23,8 +23,6 @@ class TaxiQLearner:
         Multiplicative decay factor applied to ε after each episode past threshold.
     decay_threshold : int
         Number of episodes after which ε starts decaying.
-    n_episodes : int
-        Number of training episodes.
     max_steps : int
         Maximum steps allowed per episode.
     modified_env : gym.Wrapper, optional
@@ -32,7 +30,7 @@ class TaxiQLearner:
         If None, the default environment will be used.
     """
     
-    def __init__(self, learning_rate=0.8, discount_factor=0.95, initial_exploration=1.0, min_epsilon=0.01, decay_factor=0.999, decay_threshold=2000, n_episodes=5000, max_steps=100, modified_env=None):
+    def __init__(self, learning_rate=0.8, discount_factor=0.95, initial_exploration=1.0, min_epsilon=0.01, decay_factor=0.999, decay_threshold=2000, max_steps=100, modified_env=None):
         self.alpha = learning_rate
         self.gamma = discount_factor
         self.epsilon = initial_exploration
@@ -40,8 +38,9 @@ class TaxiQLearner:
         self.decay_factor = decay_factor
         self.decay_threshold = decay_threshold
 
-        self.n_episodes = n_episodes
         self.max_steps = max_steps
+
+        self.episodes_trained = 0
         
         # Wrap the environment with the domain modifier if provided
         self.env = modified_env if modified_env else gym.make('Taxi-v3')
@@ -68,9 +67,9 @@ class TaxiQLearner:
         table.add_row("Minimum Exploration (min ε)", f"{self.min_epsilon:.3f}")
         table.add_row("Decay Factor", f"{self.decay_factor:.3f}")
         table.add_row("Decay Threshold", f"{self.decay_threshold}")
-        table.add_row("Number of Episodes", f"{self.n_episodes}")
         table.add_row("Max Steps per Episode", f"{self.max_steps}")
         table.add_row("Using Modified Environment", str(self.using_modified_env))
+        table.add_row("Episodes Trained", str(self.episodes_trained))
         
         # Print the table using the rich library
         console = Console()
@@ -94,7 +93,7 @@ class TaxiQLearner:
         sample = reward_received + self.gamma * np.max(self.Q[next_state])
         self.Q[current_state, action_taken] = (1 - self.alpha) * self.Q[current_state, action_taken] + self.alpha * sample
 
-    def log_to_csv(self, filename, episode, total_reward):
+    def log_to_csv(self, filename, total_reward):
         """
         Log episode data to a CSV file.
 
@@ -102,17 +101,15 @@ class TaxiQLearner:
         ----------
         filename : str
             Path to the CSV log file.
-        episode : int
-            Current episode number.
         total_reward : float
             Total reward obtained in the episode.
         """
 
         with open(filename, mode='a', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([episode, total_reward])
+            writer.writerow([self.episodes_trained, total_reward])
 
-    def train(self, log_to_csv=True, log_path='training_log.csv', verbose= True):
+    def train(self, log_to_csv=True, log_path='training_log.csv', n_episodes=5000, verbose= True):
         """
         Train the Q-learning agent.
 
@@ -122,16 +119,19 @@ class TaxiQLearner:
             If True, log training data to a CSV file.
         log_path : str
             Path to the training log CSV file.
+        n_episodes : int
+            Number of episodes to train the agent.
         verbose : bool
             If True, print completion message after training.
         """
-        if log_to_csv:
+        if log_to_csv and self.episodes_trained == 0: # Resets the log file if it exists or creates a new one
             with open(log_path, mode='w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(['episode', 'total_reward'])
 
-        for episode in range(1, self.n_episodes + 1):
+        for episode in range(1, n_episodes + 1):
             state, _ = self.env.reset()
+            self.episodes_trained += 1
             total_reward = 0
 
             for _ in range(self.max_steps):
@@ -154,12 +154,12 @@ class TaxiQLearner:
                 self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_factor)
 
             if log_to_csv:
-                self.log_to_csv(log_path, episode, total_reward)
+                self.log_to_csv(log_path, total_reward)
 
         self.env.close()
 
         if verbose:
-            print(f"Training completed after {self.n_episodes} episodes.")
+            print(f"Training completed after {n_episodes} episodes.")
             if log_to_csv:
                 print(f"Training log saved to {log_path}")
 
@@ -174,14 +174,7 @@ class TaxiQLearner:
         verbose : bool
             If True, print completion message after saving.
         """
-        q_min = np.min(self.Q)
-        q_max = np.max(self.Q)
-        if q_max != q_min:
-            self.Q = (self.Q - q_min) / (q_max - q_min)
-
-        # Round Q-values to 3 decimal places
-        self.Q = np.round(self.Q, 3)
-        
+      
         with open(filename, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['state'] + [f'action_{i}' for i in range(self.n_actions)])
